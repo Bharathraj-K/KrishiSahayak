@@ -9,6 +9,9 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import Dashboard from './screens/Dashboard';
 import WeatherScreen from './screens/WeatherScreen';
+import MarketScreen from './screens/MarketScreen';
+import DiseaseScreen from './screens/DiseaseScreen';
+import ChatScreen from './screens/ChatScreen';
 
 // Create theme
 const theme = createTheme({
@@ -113,6 +116,36 @@ function App() {
             element={
               isAuthenticated ? (
                 <WeatherScreen />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/market"
+            element={
+              isAuthenticated ? (
+                <MarketScreen />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/disease"
+            element={
+              isAuthenticated ? (
+                <DiseaseScreen />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              isAuthenticated ? (
+                <ChatScreen />
               ) : (
                 <Navigate to="/login" replace />
               )

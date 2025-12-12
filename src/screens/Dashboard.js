@@ -19,6 +19,7 @@ import {
   BugReport,
   AccountCircle,
   Logout,
+  SmartToy,
 } from '@mui/icons-material';
 
 const Dashboard = ({ onLogout }) => {
@@ -27,6 +28,19 @@ const Dashboard = ({ onLogout }) => {
   const handleWeatherClick = () => {
     navigate('/weather');
   };
+
+  const handleMarketClick = () => {
+    navigate('/market');
+  };
+
+  const handleDiseaseClick = () => {
+    navigate('/disease');
+  };
+
+  const handleChatClick = () => {
+    navigate('/chat');
+  };
+  
   return (
     <Box>
       <AppBar position="static">
@@ -68,7 +82,10 @@ const Dashboard = ({ onLogout }) => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
+            <Card 
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 6 } }}
+              onClick={handleMarketClick}
+            >
               <CardContent sx={{ textAlign: 'center' }}>
                 <ShowChart sx={{ fontSize: 50, color: 'success.main', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
@@ -82,7 +99,10 @@ const Dashboard = ({ onLogout }) => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
+            <Card 
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 6 } }}
+              onClick={handleDiseaseClick}
+            >
               <CardContent sx={{ textAlign: 'center' }}>
                 <BugReport sx={{ fontSize: 50, color: 'warning.main', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
@@ -90,6 +110,23 @@ const Dashboard = ({ onLogout }) => {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Identify plant diseases with AI
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 6 } }}
+              onClick={handleChatClick}
+            >
+              <CardContent sx={{ textAlign: 'center' }}>
+                <SmartToy sx={{ fontSize: 50, color: 'secondary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  AI Chat
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Get farming advice from AI assistant
                 </Typography>
               </CardContent>
             </Card>
@@ -112,20 +149,20 @@ const Dashboard = ({ onLogout }) => {
 
         <Paper sx={{ p: 3, mt: 4 }}>
           <Typography variant="h5" gutterBottom>
-            🎉 Authentication System Complete!
+            🎉 Phase 6 Complete: AI Chat Assistant!
           </Typography>
           <Typography variant="body1" paragraph>
-            Your KrishiSahayak web application is now fully functional with:
+            Your KrishiSahayak application now has all major features:
           </Typography>
           <ul>
-            <li>User Registration & Login</li>
-            <li>JWT Token Authentication</li>
-            <li>Protected Dashboard</li>
-            <li>Logout Functionality</li>
-            <li>Modern Material-UI Design</li>
+            <li>✅ Authentication System (Login/Register)</li>
+            <li>✅ Weather Forecasts & Farming Advice</li>
+            <li>✅ Market Prices & Price Trends</li>
+            <li>✅ AI Disease Detection with Treatment</li>
+            <li>✅ AI Chat Assistant for Farming Questions</li>
           </ul>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Ready to implement Phase 3 (Weather Integration) and other features!
+            All features are fully functional! Next: Profile Management
           </Typography>
         </Paper>
       </Container>

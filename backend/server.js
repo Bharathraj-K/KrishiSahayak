@@ -12,6 +12,9 @@ const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 // Import routes
 const authRoutes = require('./src/routes/auth');
 const weatherRoutes = require('./src/routes/weather');
+const marketRoutes = require('./src/routes/market');
+const diseaseRoutes = require('./src/routes/disease');
+const chatRoutes = require('./src/routes/chat');
 
 // Initialize express app
 const app = express();
@@ -79,6 +82,9 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/disease', diseaseRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Handle undefined routes
 app.use(notFound);
