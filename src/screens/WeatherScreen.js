@@ -1,446 +1,340 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  RefreshControl 
-} from 'react-native';
-import { 
-  Card, 
-  Title, 
-  Paragraph, 
+import {
+  Container,
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  Card,
+  CardContent,
+  TextField,
   Button,
-  ActivityIndicator,
-  Chip 
-} from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, styles } from '../styles/theme';
+  CircularProgress,
+  Alert,
+  Chip,
+  Divider,
+} from '@mui/material';
+import {
+  WbSunny,
+  Cloud,
+  Opacity,
+  Air,
+  Visibility,
+  ThermostatAuto,
+  LocationOn,
+  Search,
+  WbTwilight,
+  NightsStay,
+} from '@mui/icons-material';
+import api from '../services/api.web';
 
 const WeatherScreen = () => {
-  const [weatherData, setWeatherData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [city, setCity] = useState('');
+  const [currentWeather, setCurrentWeather] = useState(null);
+  const [forecast, setForecast] = useState(null);
 
   useEffect(() => {
-    loadWeatherData();
+    // Try to get weather for user's location on mount
+    getUserLocationWeather();
   }, []);
 
-  const loadWeatherData = async () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const mockWeatherData = {
-        location: 'Noida, Uttar Pradesh',
-        current: {
-          temperature: 28,
-          condition: 'Sunny',
-          humidity: 65,
-          windSpeed: 12,
-          pressure: 1013,
-          uvIndex: 6,
-          visibility: 10,
-          icon: 'weather-sunny'
-        },
-        hourly: [
-          { time: '12:00', temp: 28, icon: 'weather-sunny', condition: 'Sunny' },
-          { time: '15:00', temp: 31, icon: 'weather-partly-cloudy', condition: 'Partly Cloudy' },
-          { time: '18:00', temp: 29, icon: 'weather-cloudy', condition: 'Cloudy' },
-          { time: '21:00', temp: 26, icon: 'weather-night', condition: 'Clear Night' },
-        ],
-        daily: [
-          { day: 'Today', high: 32, low: 24, condition: 'Sunny', icon: 'weather-sunny', rain: 0 },
-          { day: 'Tomorrow', high: 30, low: 23, condition: 'Cloudy', icon: 'weather-cloudy', rain: 20 },
-          { day: 'Day After', high: 28, low: 21, condition: 'Rainy', icon: 'weather-rainy', rain: 80 },
-          { day: 'Monday', high: 29, low: 22, condition: 'Partly Cloudy', icon: 'weather-partly-cloudy', rain: 10 },
-          { day: 'Tuesday', high: 33, low: 25, condition: 'Sunny', icon: 'weather-sunny', rain: 0 },
-        ],
-        alerts: [
-          {
-            type: 'warning',
-            title: 'Heavy Rain Warning',
-            description: 'Heavy rain expected in next 24 hours. Protect your crops.'
-          }
-        ],
-        farmingAdvice: [
-          'Complete spraying work early morning today',
-          'Avoid field work from 12-3 PM',
-          'Evening is suitable for irrigation work'
-        ]
-      };
-      setWeatherData(mockWeatherData);
+  const getUserLocationWeather = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await api.get('/weather/my-location');
+      
+      if (response.data.success) {
+        setCurrentWeather(response.data.data);
+        // Also fetch forecast
+        if (response.data.data.location) {
+          await getForecast(response.data.data.location.name);
+        }
+      }
+    } catch (error) {
+      // Silently fail - user can manually search
+      console.log('No location in profile');
+    } finally {
       setLoading(false);
-      setRefreshing(false);
-    }, 1500);
+    }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadWeatherData();
+  const searchWeather = async () => {
+    if (!city.trim()) {
+      setError('Please enter a city name');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const [weatherResponse, forecastResponse] = await Promise.all([
+        api.get(`/weather/current?city=${encodeURIComponent(city)}`),
+        api.get(`/weather/forecast?city=${encodeURIComponent(city)}`)
+      ]);
+
+      if (weatherResponse.data.success) {
+        setCurrentWeather(weatherResponse.data.data);
+      }
+
+      if (forecastResponse.data.success) {
+        setForecast(forecastResponse.data.data);
+      }
+    } catch (error) {
+      setError(error.response?.data?.error?.message || 'Failed to fetch weather data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getWeatherIcon = (iconName) => {
-    const iconMap = {
-      'weather-sunny': 'weather-sunny',
-      'weather-cloudy': 'weather-cloudy',
-      'weather-partly-cloudy': 'weather-partly-cloudy',
-      'weather-rainy': 'weather-rainy',
-      'weather-night': 'weather-night',
+  const getForecast = async (cityName) => {
+    try {
+      const response = await api.get(`/weather/forecast?city=${encodeURIComponent(cityName)}`);
+      if (response.data.success) {
+        setForecast(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch forecast');
+    }
+  };
+
+  const getWeatherIcon = (condition) => {
+    const icons = {
+      Clear: <WbSunny sx={{ fontSize: 60, color: '#FDB813' }} />,
+      Clouds: <Cloud sx={{ fontSize: 60, color: '#95A5A6' }} />,
+      Rain: <Opacity sx={{ fontSize: 60, color: '#3498DB' }} />,
+      Snow: <Cloud sx={{ fontSize: 60, color: '#ECF0F1' }} />,
+      Mist: <Cloud sx={{ fontSize: 60, color: '#BDC3C7' }} />,
     };
-    return iconMap[iconName] || 'weather-sunny';
+    return icons[condition] || <Cloud sx={{ fontSize: 60 }} />;
   };
 
-  const getRainColor = (rainChance) => {
-    if (rainChance >= 70) return theme.colors.error;
-    if (rainChance >= 40) return theme.colors.warning;
-    return theme.colors.info;
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
   };
-
-  if (loading && !weatherData) {
-    return (
-      <View style={weatherStyles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={weatherStyles.loadingText}>Loading weather information...</Text>
-      </View>
-    );
-  }
 
   return (
-    <ScrollView 
-      style={weatherStyles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Current Weather */}
-      <Card style={[styles.card, weatherStyles.currentWeatherCard]}>
-        <View style={weatherStyles.currentWeatherHeader}>
-          <View style={weatherStyles.locationContainer}>
-            <MaterialCommunityIcons name="map-marker" size={20} color="white" />
-            <Text style={weatherStyles.locationText}>{weatherData?.location}</Text>
-          </View>
-          <Button onPress={onRefresh} textColor="white">
-            <MaterialCommunityIcons name="refresh" size={16} />
-            {'  '}Update
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Weather Forecast 🌤️
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Get accurate weather forecasts and farming advice
+      </Typography>
+
+      {/* Search Box */}
+      <Paper sx={{ p: 2, mt: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField
+            fullWidth
+            placeholder="Enter city name (e.g., Mumbai, Delhi)"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && searchWeather()}
+            InputProps={{
+              startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={searchWeather}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <Search />}
+            sx={{ minWidth: 120 }}
+          >
+            Search
           </Button>
-        </View>
+        </Box>
+      </Paper>
 
-        <View style={weatherStyles.currentWeatherContent}>
-          <View style={weatherStyles.temperatureSection}>
-            <MaterialCommunityIcons 
-              name={getWeatherIcon(weatherData?.current.icon)} 
-              size={80} 
-              color="white" 
-            />
-            <Text style={weatherStyles.temperature}>
-              {weatherData?.current.temperature}°C
-            </Text>
-          </View>
-          <Text style={weatherStyles.condition}>
-            {weatherData?.current.condition}
-          </Text>
-        </View>
-      </Card>
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
-      {/* Weather Alerts */}
-      {weatherData?.alerts?.map((alert, index) => (
-        <Card key={index} style={[styles.card, weatherStyles.alertCard]}>
-          <View style={weatherStyles.alertHeader}>
-            <MaterialCommunityIcons name="alert" size={24} color={theme.colors.error} />
-            <Text style={weatherStyles.alertTitle}>{alert.title}</Text>
-          </View>
-          <Text style={weatherStyles.alertDescription}>{alert.description}</Text>
-        </Card>
-      ))}
+      {/* Current Weather */}
+      {currentWeather && (
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <LocationOn sx={{ mr: 1, color: 'primary.main' }} />
+            <Typography variant="h5">
+              {currentWeather.location.name}, {currentWeather.location.country}
+            </Typography>
+          </Box>
 
-      {/* Detailed Weather Info */}
-      <Card style={[styles.card]}>
-        <Title style={weatherStyles.sectionTitle}>Detailed Information</Title>
-        <View style={weatherStyles.detailsGrid}>
-          <View style={weatherStyles.detailItem}>
-            <MaterialCommunityIcons name="water-percent" size={24} color={theme.colors.info} />
-            <Text style={weatherStyles.detailLabel}>Humidity</Text>
-            <Text style={weatherStyles.detailValue}>{weatherData?.current.humidity}%</Text>
-          </View>
-          <View style={weatherStyles.detailItem}>
-            <MaterialCommunityIcons name="weather-windy" size={24} color={theme.colors.info} />
-            <Text style={weatherStyles.detailLabel}>Wind</Text>
-            <Text style={weatherStyles.detailValue}>{weatherData?.current.windSpeed} km/h</Text>
-          </View>
-          <View style={weatherStyles.detailItem}>
-            <MaterialCommunityIcons name="gauge" size={24} color={theme.colors.info} />
-            <Text style={weatherStyles.detailLabel}>Pressure</Text>
-            <Text style={weatherStyles.detailValue}>{weatherData?.current.pressure} mb</Text>
-          </View>
-          <View style={weatherStyles.detailItem}>
-            <MaterialCommunityIcons name="white-balance-sunny" size={24} color={theme.colors.warning} />
-            <Text style={weatherStyles.detailLabel}>UV Index</Text>
-            <Text style={weatherStyles.detailValue}>{weatherData?.current.uvIndex}</Text>
-          </View>
-        </View>
-      </Card>
+          <Grid container spacing={3}>
+            {/* Main Weather */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                {getWeatherIcon(currentWeather.current.main)}
+                <Box>
+                  <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
+                    {currentWeather.current.temperature}°C
+                  </Typography>
+                  <Typography variant="h6" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                    {currentWeather.current.description}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Feels like {currentWeather.current.feelsLike}°C
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
 
-      {/* Hourly Forecast */}
-      <Card style={[styles.card]}>
-        <Title style={weatherStyles.sectionTitle}>Today's Weather</Title>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={weatherStyles.hourlyContainer}>
-            {weatherData?.hourly.map((hour, index) => (
-              <View key={index} style={weatherStyles.hourlyItem}>
-                <Text style={weatherStyles.hourlyTime}>{hour.time}</Text>
-                <MaterialCommunityIcons 
-                  name={getWeatherIcon(hour.icon)} 
-                  size={32} 
-                  color={theme.colors.primary} 
-                />
-                <Text style={weatherStyles.hourlyTemp}>{hour.temp}°</Text>
-                <Text style={weatherStyles.hourlyCondition}>{hour.condition}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </Card>
+            {/* Weather Details */}
+            <Grid item xs={12} md={6}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ThermostatAuto color="error" />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">High / Low</Typography>
+                      <Typography variant="body1">{currentWeather.current.tempMax}° / {currentWeather.current.tempMin}°</Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Opacity color="info" />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Humidity</Typography>
+                      <Typography variant="body1">{currentWeather.current.humidity}%</Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Air color="primary" />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Wind Speed</Typography>
+                      <Typography variant="body1">{currentWeather.current.windSpeed} m/s</Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Visibility color="action" />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Visibility</Typography>
+                      <Typography variant="body1">{(currentWeather.current.visibility / 1000).toFixed(1)} km</Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <WbTwilight color="warning" fontSize="small" />
+                  <Typography variant="caption">
+                    {new Date(currentWeather.current.sunrise).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <NightsStay color="primary" fontSize="small" />
+                  <Typography variant="caption">
+                    {new Date(currentWeather.current.sunset).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {/* Farming Advice */}
+          {currentWeather.farmingAdvice && currentWeather.farmingAdvice.length > 0 && (
+            <>
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="h6" gutterBottom>
+                Farming Advice
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {currentWeather.farmingAdvice.map((advice, index) => (
+                  <Alert
+                    key={index}
+                    severity={advice.type === 'warning' ? 'warning' : 'info'}
+                    icon={<span style={{ fontSize: 20 }}>{advice.icon}</span>}
+                  >
+                    {advice.message}
+                  </Alert>
+                ))}
+              </Box>
+            </>
+          )}
+        </Paper>
+      )}
 
       {/* 5-Day Forecast */}
-      <Card style={[styles.card]}>
-        <Title style={weatherStyles.sectionTitle}>5 Day Forecast</Title>
-        {weatherData?.daily.map((day, index) => (
-          <View key={index} style={weatherStyles.dailyItem}>
-            <View style={weatherStyles.dailyLeft}>
-              <Text style={weatherStyles.dayName}>{day.day}</Text>
-              <MaterialCommunityIcons 
-                name={getWeatherIcon(day.icon)} 
-                size={32} 
-                color={theme.colors.primary} 
-              />
-            </View>
-            <View style={weatherStyles.dailyMiddle}>
-              <Text style={weatherStyles.dailyCondition}>{day.condition}</Text>
-              <Chip 
-                style={[weatherStyles.rainChip, { backgroundColor: getRainColor(day.rain) }]}
-                textStyle={{ color: 'white', fontSize: 10 }}
-              >
-                {day.rain}% Rain
-              </Chip>
-            </View>
-            <View style={weatherStyles.dailyRight}>
-              <Text style={weatherStyles.dailyHigh}>{day.high}°</Text>
-              <Text style={weatherStyles.dailyLow}>{day.low}°</Text>
-            </View>
-          </View>
-        ))}
-      </Card>
+      {forecast && forecast.forecast && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            5-Day Forecast
+          </Typography>
+          <Grid container spacing={2}>
+            {forecast.forecast.map((day, index) => (
+              <Grid item xs={12} sm={6} md={2.4} key={index}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="subtitle2" align="center" gutterBottom>
+                      {formatDate(day.date)}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 1 }}>
+                      {getWeatherIcon(day.condition)}
+                    </Box>
+                    <Typography variant="body2" align="center" color="text.secondary" gutterBottom>
+                      {day.condition}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                      <Chip label={`${day.tempMax}°`} size="small" color="error" />
+                      <Chip label={`${day.tempMin}°`} size="small" color="primary" />
+                    </Box>
+                    {day.rainfall > 0 && (
+                      <Typography variant="caption" display="block" align="center" sx={{ mt: 1 }}>
+                        💧 {day.rainfall}mm rain
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
 
-      {/* Farming Advice */}
-      <Card style={[styles.card, { marginBottom: 20 }]}>
-        <Title style={weatherStyles.sectionTitle}>Advice for Farmers</Title>
-        {weatherData?.farmingAdvice.map((advice, index) => (
-          <View key={index} style={weatherStyles.adviceItem}>
-            <MaterialCommunityIcons 
-              name="lightbulb-on" 
-              size={16} 
-              color={theme.colors.warning} 
-            />
-            <Text style={weatherStyles.adviceText}>{advice}</Text>
-          </View>
-        ))}
-      </Card>
-    </ScrollView>
+          {/* Weekly Advice */}
+          {forecast.weeklyAdvice && forecast.weeklyAdvice.length > 0 && (
+            <Paper sx={{ p: 2, mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                This Week's Farming Advice
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {forecast.weeklyAdvice.map((advice, index) => (
+                  <Alert
+                    key={index}
+                    severity={advice.type === 'warning' ? 'warning' : 'info'}
+                    icon={<span style={{ fontSize: 20 }}>{advice.icon}</span>}
+                  >
+                    {advice.message}
+                  </Alert>
+                ))}
+              </Box>
+            </Paper>
+          )}
+        </Box>
+      )}
+
+      {loading && !currentWeather && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+    </Container>
   );
 };
-
-const weatherStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  currentWeatherCard: {
-    backgroundColor: theme.colors.primary,
-    marginBottom: 10,
-  },
-  currentWeatherHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  currentWeatherContent: {
-    alignItems: 'center',
-  },
-  temperatureSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  temperature: {
-    color: 'white',
-    fontSize: 48,
-    fontWeight: 'bold',
-    marginLeft: 20,
-  },
-  condition: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  alertCard: {
-    backgroundColor: '#FFEBEE',
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.error,
-  },
-  alertHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.colors.error,
-    marginLeft: 10,
-  },
-  alertDescription: {
-    fontSize: 14,
-    color: theme.colors.text,
-    lineHeight: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    marginBottom: 15,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  detailItem: {
-    width: '48%',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: theme.colors.text,
-    marginTop: 5,
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    marginTop: 2,
-  },
-  hourlyContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 5,
-  },
-  hourlyItem: {
-    alignItems: 'center',
-    padding: 10,
-    marginHorizontal: 5,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    minWidth: 80,
-  },
-  hourlyTime: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-  },
-  hourlyTemp: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    marginTop: 5,
-  },
-  hourlyCondition: {
-    fontSize: 10,
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  dailyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  dailyLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dayName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginRight: 15,
-    minWidth: 50,
-  },
-  dailyMiddle: {
-    flex: 2,
-    alignItems: 'flex-start',
-  },
-  dailyCondition: {
-    fontSize: 14,
-    color: theme.colors.text,
-    marginBottom: 5,
-  },
-  rainChip: {
-    height: 20,
-  },
-  dailyRight: {
-    alignItems: 'flex-end',
-  },
-  dailyHigh: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-  },
-  dailyLow: {
-    fontSize: 14,
-    color: theme.colors.text,
-    opacity: 0.7,
-  },
-  adviceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  adviceText: {
-    fontSize: 14,
-    marginLeft: 10,
-    flex: 1,
-    color: theme.colors.text,
-    lineHeight: 20,
-  },
-});
 
 export default WeatherScreen;
