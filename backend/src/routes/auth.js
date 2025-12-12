@@ -57,6 +57,7 @@ router.get('/profile', AuthController.getProfile);
 // Update user profile
 router.put('/profile', 
   ...updateProfileValidation,
+  checkValidation,
   AuthController.updateProfile
 );
 

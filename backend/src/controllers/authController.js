@@ -166,31 +166,43 @@ class AuthController {
 
   // Update user profile
   static updateProfile = catchAsync(async (req, res, next) => {
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(validationError(errors.array()));
-    }
-
     const { user } = req;
-    const updateData = req.body;
+    const { profile, settings } = req.body;
 
-    // Fields that can be updated
-    const allowedFields = [
-      'profile.name',
-      'profile.phone',
-      'profile.location',
-      'profile.farmDetails',
-      'settings'
-    ];
-
-    // Build update object
+    // Build update object with only provided fields
     const updateObj = {};
-    Object.keys(updateData).forEach(key => {
-      if (allowedFields.some(field => key.startsWith(field.split('.')[0]))) {
-        updateObj[key] = updateData[key];
+    
+    if (profile) {
+      updateObj.profile = { ...user.profile, ...profile };
+      
+      // Handle nested location object
+      if (profile.location) {
+        updateObj.profile.location = { 
+          ...user.profile.location, 
+          ...profile.location 
+        };
       }
-    });
+      
+      // Handle nested farmDetails object
+      if (profile.farmDetails) {
+        updateObj.profile.farmDetails = { 
+          ...user.profile.farmDetails, 
+          ...profile.farmDetails 
+        };
+      }
+    }
+    
+    if (settings) {
+      updateObj.settings = { ...user.settings, ...settings };
+      
+      // Handle nested notifications object
+      if (settings.notifications) {
+        updateObj.settings.notifications = { 
+          ...user.settings.notifications, 
+          ...settings.notifications 
+        };
+      }
+    }
 
     if (Object.keys(updateObj).length === 0) {
       return next(createError('No valid fields to update', 400, 'NO_UPDATE_FIELDS'));

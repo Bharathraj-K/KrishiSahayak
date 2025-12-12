@@ -60,7 +60,7 @@ const changePasswordValidation = [
 // Validation rules for profile update
 const updateProfileValidation = [
   body('profile.name')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Name must be between 2 and 50 characters')
@@ -68,99 +68,111 @@ const updateProfileValidation = [
     .withMessage('Name can only contain letters and spaces'),
   
   body('profile.phone')
-    .optional()
+    .optional({ values: 'falsy' })
     .isMobilePhone('en-IN')
     .withMessage('Please provide a valid Indian phone number'),
   
   body('profile.location.address')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 200 })
     .withMessage('Address cannot exceed 200 characters'),
   
+  body('profile.location.city')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('City cannot exceed 100 characters'),
+  
+  body('profile.location.state')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('State cannot exceed 100 characters'),
+  
   body('profile.location.pincode')
-    .optional()
+    .optional({ values: 'falsy' })
     .matches(/^\d{6}$/)
     .withMessage('Please provide a valid 6-digit pincode'),
   
   body('profile.location.coordinates')
-    .optional()
+    .optional({ values: 'falsy' })
     .isArray({ min: 2, max: 2 })
     .withMessage('Coordinates must be an array of [longitude, latitude]'),
   
   body('profile.location.coordinates.*')
-    .optional()
+    .optional({ values: 'falsy' })
     .isFloat({ min: -180, max: 180 })
     .withMessage('Coordinates must be valid longitude and latitude values'),
   
   body('profile.farmDetails.farmSize')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['Small (< 2 acres)', 'Medium (2-10 acres)', 'Large (> 10 acres)', 'Commercial'])
     .withMessage('Invalid farm size option'),
   
   body('profile.farmDetails.farmType')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['Organic', 'Conventional', 'Mixed'])
     .withMessage('Invalid farm type option'),
   
   body('profile.farmDetails.cropsGrown')
-    .optional()
+    .optional({ values: 'falsy' })
     .isArray()
     .withMessage('Crops grown must be an array'),
   
   body('profile.farmDetails.cropsGrown.*')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ min: 1, max: 50 })
     .withMessage('Each crop name must be between 1 and 50 characters'),
   
   body('profile.farmDetails.soilType')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['Clay', 'Sandy', 'Loamy', 'Silt', 'Chalky', 'Peaty'])
     .withMessage('Invalid soil type option'),
   
   body('profile.farmDetails.irrigationType')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['Rain-fed', 'Drip', 'Sprinkler', 'Flood', 'Mixed'])
     .withMessage('Invalid irrigation type option'),
   
   body('settings.notifications.weather')
-    .optional()
+    .optional({ values: 'falsy' })
     .isBoolean()
     .withMessage('Weather notification setting must be true or false'),
   
   body('settings.notifications.priceAlerts')
-    .optional()
+    .optional({ values: 'falsy' })
     .isBoolean()
     .withMessage('Price alerts setting must be true or false'),
   
   body('settings.notifications.diseases')
-    .optional()
+    .optional({ values: 'falsy' })
     .isBoolean()
     .withMessage('Disease notification setting must be true or false'),
   
   body('settings.notifications.general')
-    .optional()
+    .optional({ values: 'falsy' })
     .isBoolean()
     .withMessage('General notification setting must be true or false'),
   
   body('settings.language')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['en', 'hi'])
     .withMessage('Language must be either English (en) or Hindi (hi)'),
   
   body('settings.theme')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['light', 'dark', 'auto'])
     .withMessage('Theme must be light, dark, or auto'),
   
   body('settings.units.temperature')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['celsius', 'fahrenheit'])
     .withMessage('Temperature unit must be celsius or fahrenheit'),
   
   body('settings.units.area')
-    .optional()
+    .optional({ values: 'falsy' })
     .isIn(['acre', 'hectare'])
     .withMessage('Area unit must be acre or hectare')
 ];
