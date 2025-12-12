@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const JWTUtils = require('../utils/jwt');
+const NotificationService = require('../services/notificationService');
 const { 
   createError, 
   catchAsync, 
@@ -38,6 +39,9 @@ class AuthController {
     // Update login stats
     user.stats.loginCount += 1;
     await user.save({ validateBeforeSave: false });
+
+    // Create welcome notification for new users
+    NotificationService.createWelcomeNotification(user._id, user.profile.name);
 
     // Remove password from output
     user.password = undefined;

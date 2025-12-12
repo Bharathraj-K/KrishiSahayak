@@ -21,6 +21,7 @@ import {
   Logout,
   SmartToy,
 } from '@mui/icons-material';
+import NotificationBell from '../components/NotificationBell';
 
 const Dashboard = ({ onLogout }) => {
   const navigate = useNavigate();
@@ -40,6 +41,10 @@ const Dashboard = ({ onLogout }) => {
   const handleChatClick = () => {
     navigate('/chat');
   };
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+  };
   
   return (
     <Box>
@@ -49,6 +54,7 @@ const Dashboard = ({ onLogout }) => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             कृषि सहायक - KrishiSahayak
           </Typography>
+          <NotificationBell />
           <Button color="inherit" startIcon={<Logout />} onClick={onLogout}>
             Logout
           </Button>
@@ -133,7 +139,10 @@ const Dashboard = ({ onLogout }) => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
+            <Card 
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 6 } }}
+              onClick={handleProfileClick}
+            >
               <CardContent sx={{ textAlign: 'center' }}>
                 <AccountCircle sx={{ fontSize: 50, color: 'info.main', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
@@ -160,10 +169,19 @@ const Dashboard = ({ onLogout }) => {
             <li>✅ Market Prices & Price Trends</li>
             <li>✅ AI Disease Detection with Treatment</li>
             <li>✅ AI Chat Assistant for Farming Questions</li>
+            <li>✅ Profile Management with Farm Details</li>
+            <li>✅ In-App Notifications System</li>
           </ul>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            All features are fully functional! Next: Profile Management
+            All features are fully functional! 
           </Typography>
+          <Button 
+            variant="outlined" 
+            sx={{ mt: 2 }}
+            onClick={() => navigate('/test-notifications')}
+          >
+            Test Notifications
+          </Button>
         </Paper>
       </Container>
     </Box>

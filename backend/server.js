@@ -15,6 +15,7 @@ const weatherRoutes = require('./src/routes/weather');
 const marketRoutes = require('./src/routes/market');
 const diseaseRoutes = require('./src/routes/disease');
 const chatRoutes = require('./src/routes/chat');
+const notificationRoutes = require('./src/routes/notifications');
 
 // Initialize express app
 const app = express();
@@ -85,6 +86,7 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/disease', diseaseRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Handle undefined routes
 app.use(notFound);

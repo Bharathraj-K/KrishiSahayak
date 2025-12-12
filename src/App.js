@@ -12,6 +12,8 @@ import WeatherScreen from './screens/WeatherScreen';
 import MarketScreen from './screens/MarketScreen';
 import DiseaseScreen from './screens/DiseaseScreen';
 import ChatScreen from './screens/ChatScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import TestNotifications from './screens/TestNotifications';
 
 // Create theme
 const theme = createTheme({
@@ -146,6 +148,26 @@ function App() {
             element={
               isAuthenticated ? (
                 <ChatScreen />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              isAuthenticated ? (
+                <ProfileScreen />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/test-notifications"
+            element={
+              isAuthenticated ? (
+                <TestNotifications />
               ) : (
                 <Navigate to="/login" replace />
               )
