@@ -11,7 +11,7 @@ import json
 app = Flask(__name__)
 CORS(app)
 
-# Disease classes (14 common crop diseases in India)
+# Disease classes (will be updated from trained model if available)
 DISEASE_CLASSES = [
     'Tomato_Early_Blight',
     'Tomato_Late_Blight', 
@@ -31,7 +31,7 @@ DISEASE_CLASSES = [
 
 # Load disease information database
 DISEASE_INFO = {
-    'Tomato_Early_Blight': {
+    'Tomato_Early_blight': {
         'name': 'Tomato Early Blight',
         'scientific_name': 'Alternaria solani',
         'description': 'Early blight is a common fungal disease that causes dark brown spots with concentric rings on older leaves.',
@@ -62,7 +62,7 @@ DISEASE_INFO = {
             'Remove plant debris after harvest'
         ]
     },
-    'Tomato_Late_Blight': {
+    'Tomato_Late_blight': {
         'name': 'Tomato Late Blight',
         'scientific_name': 'Phytophthora infestans',
         'description': 'A devastating disease that can destroy entire crops within days during humid conditions.',
@@ -91,7 +91,7 @@ DISEASE_INFO = {
             'Monitor weather for high humidity'
         ]
     },
-    'Potato_Early_Blight': {
+    'Potato___Early_blight': {
         'name': 'Potato Early Blight',
         'scientific_name': 'Alternaria solani',
         'description': 'Common fungal disease causing yield loss in potatoes.',
@@ -120,7 +120,7 @@ DISEASE_INFO = {
             'Avoid water stress'
         ]
     },
-    'Potato_Late_Blight': {
+    'Potato_Late_blight': {
         'name': 'Potato Late Blight',
         'scientific_name': 'Phytophthora infestans',
         'description': 'Historic disease that caused Irish potato famine, still devastating today.',
@@ -212,19 +212,32 @@ DISEASE_INFO = {
 # Load pre-trained ResNet-50 model
 print("Loading AI model...")
 model = models.resnet50(pretrained=True)
-num_classes = len(DISEASE_CLASSES)
-model.fc = nn.Linear(model.fc.in_features, num_classes)
 
 # Load trained weights if available
 import os
+MODEL_TRAINED = False
+MODEL_ACCURACY = 0.0
+
 if os.path.exists('disease_model_best.pth'):
     print("✅ Loading trained model weights from disease_model_best.pth")
     checkpoint = torch.load('disease_model_best.pth', map_location='cpu')
+    
+    # Use classes from trained model if available
+    if 'classes' in checkpoint:
+        DISEASE_CLASSES = checkpoint['classes']
+        print(f"✅ Loaded {len(DISEASE_CLASSES)} disease classes from trained model")
+    
+    num_classes = len(DISEASE_CLASSES)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
     model.load_state_dict(checkpoint['model_state_dict'])
-    print(f"✅ Model trained with accuracy: {checkpoint.get('accuracy', 'N/A')}")
+    MODEL_ACCURACY = checkpoint.get('accuracy', 0.0)
+    MODEL_TRAINED = True
+    print(f"✅ Model trained with accuracy: {MODEL_ACCURACY:.2f}%")
 else:
-    print("⚠️  Using ImageNet pretrained weights (untrained on plant diseases)")
-    print("💡 Run train_model.py to train on PlantVillage dataset")
+    print("⚠️  Model file not found! Please train the model first.")
+    print("💡 Run train_model.py or use Google Colab notebook")
+    num_classes = len(DISEASE_CLASSES)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
 
 model.eval()
 print(f"Model loaded successfully with {num_classes} disease classes")
@@ -242,6 +255,7 @@ transform = transforms.Compose([
 
 def get_disease_info(disease_class):
     """Get detailed information about a disease"""
+    print(disease_class)
     if disease_class in DISEASE_INFO:
         return DISEASE_INFO[disease_class]
     
@@ -280,7 +294,9 @@ def health_check():
         'status': 'healthy',
         'service': 'Disease Detection AI',
         'model': 'ResNet-50',
-        'classes': len(DISEASE_CLASSES)
+        'classes': len(DISEASE_CLASSES),
+        'trained': MODEL_TRAINED,
+        'accuracy': MODEL_ACCURACY
     }), 200
 
 @app.route('/detect', methods=['POST'])
@@ -350,6 +366,8 @@ def detect_disease():
                     'chemical': disease_info['chemical_treatment']
                 },
                 'prevention': disease_info['prevention'],
+                'model_trained': MODEL_TRAINED,
+                'model_accuracy': MODEL_ACCURACY,
                 'alternative_predictions': [
                     {
                         'disease': DISEASE_CLASSES[top3_idx[i].item()].replace('_', ' '),

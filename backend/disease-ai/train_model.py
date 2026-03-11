@@ -13,33 +13,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
+import kagglehub
+path = kagglehub.dataset_download("emmarex/plantdisease")
+print("Path to dataset files:", path)
 import os
 
 # Configuration
-DATASET_PATH = 'PlantVillage'  # Download from Kaggle
+# The actual dataset is in nested PlantVillage folder
+DATASET_PATH = os.path.join(path, 'PlantVillage', 'PlantVillage')
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
 LEARNING_RATE = 0.001
-NUM_CLASSES = 14  # Our specific disease classes
+TRAIN_SPLIT = 0.8  # 80% train, 20% validation
+NUM_CLASSES = None  # Will be determined from dataset
 
-# Disease classes mapping
-DISEASE_CLASSES = [
-    'Tomato_Early_Blight',
-    'Tomato_Late_Blight', 
-    'Tomato_Leaf_Mold',
-    'Tomato_Septoria_Leaf_Spot',
-    'Tomato_Yellow_Leaf_Curl_Virus',
-    'Tomato_Healthy',
-    'Potato_Early_Blight',
-    'Potato_Late_Blight',
-    'Potato_Healthy',
-    'Corn_Common_Rust',
-    'Corn_Gray_Leaf_Spot',
-    'Corn_Healthy',
-    'Rice_Leaf_Blast',
-    'Rice_Brown_Spot'
-]
+# Disease classes mapping - will be auto-detected from dataset
+DISEASE_CLASSES = []
 
 # Data augmentation and normalization
 train_transform = transforms.Compose([
@@ -60,6 +50,8 @@ val_transform = transforms.Compose([
 ])
 
 def train_model():
+    global NUM_CLASSES, DISEASE_CLASSES
+    
     print("=" * 60)
     print("🌾 KrishiSahayak - Plant Disease Detection Model Training")
     print("=" * 60)
@@ -71,23 +63,53 @@ def train_model():
         print("   https://www.kaggle.com/datasets/emmarex/plantdisease")
         return
     
-    # Load datasets
+    # Load entire dataset first with validation transforms
     print("\n📂 Loading dataset...")
-    train_data = datasets.ImageFolder(
-        os.path.join(DATASET_PATH, 'train'), 
-        transform=train_transform
-    )
-    val_data = datasets.ImageFolder(
-        os.path.join(DATASET_PATH, 'val'), 
-        transform=val_transform
+    full_dataset = datasets.ImageFolder(
+        DATASET_PATH,
+        transform=None  # We'll apply transforms after split
     )
     
-    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
+    # Get classes from dataset
+    DISEASE_CLASSES = full_dataset.classes
+    NUM_CLASSES = len(DISEASE_CLASSES)
+    print(f"✅ Found {NUM_CLASSES} disease classes")
+    print(f"📋 Classes: {', '.join(DISEASE_CLASSES[:5])}... (and {NUM_CLASSES-5} more)")
     
-    print(f"✅ Training samples: {len(train_data)}")
-    print(f"✅ Validation samples: {len(val_data)}")
-    print(f"✅ Number of classes: {NUM_CLASSES}")
+    # Split dataset into train and validation
+    train_size = int(TRAIN_SPLIT * len(full_dataset))
+    val_size = len(full_dataset) - train_size
+    
+    # Create random split
+    train_dataset, val_dataset = random_split(
+        full_dataset, 
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)  # For reproducibility
+    )
+    
+    # Apply transforms to the split datasets
+    # Create new datasets with transforms
+    train_data = datasets.ImageFolder(DATASET_PATH, transform=train_transform)
+    val_data = datasets.ImageFolder(DATASET_PATH, transform=val_transform)
+    
+    # Re-apply the split with same indices
+    train_data, _ = random_split(
+        train_data, 
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)
+    )
+    _, val_data = random_split(
+        val_data, 
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)
+    )
+    
+    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    
+    print(f"✅ Training samples: {train_size}")
+    print(f"✅ Validation samples: {val_size}")
+    print(f"✅ Train/Val split: {int(TRAIN_SPLIT*100)}/{int((1-TRAIN_SPLIT)*100)}")
     
     # Load pre-trained ResNet-50 (better than ResNet-18)
     print("\n🔧 Loading ResNet-50 model...")
