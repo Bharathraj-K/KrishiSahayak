@@ -1,4 +1,5 @@
 const { validationResult } = require('express-validator');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const JWTUtils = require('../utils/jwt');
 const NotificationService = require('../services/notificationService');
@@ -10,9 +11,12 @@ const {
 } = require('../middleware/errorHandler');
 
 class AuthController {
+  static googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
   // Register new user
   static register = catchAsync(async (req, res, next) => {
-    const { email, password, name, phone } = req.body;
+    const { email, password, name, phone, role } = req.body;
+    const selectedRole = ['farmer', 'customer'].includes(role) ? role : 'farmer';
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -23,6 +27,7 @@ class AuthController {
     // Create new user
     const user = await User.create({
       email,
+      role: selectedRole,
       password,
       profile: {
         name,
@@ -50,6 +55,7 @@ class AuthController {
       user: {
         id: user._id,
         email: user.email,
+        role: user.role,
         profile: user.profile,
         settings: user.settings,
         isVerified: user.isVerified
@@ -66,13 +72,22 @@ class AuthController {
       return next(validationError(errors.array()));
     }
 
-    const { email, password, deviceInfo } = req.body;
+    const { email, password, deviceInfo, expectedRole } = req.body;
 
     // Check if user exists and get password
     const user = await User.findOne({ email }).select('+password');
     
     if (!user || !(await user.correctPassword(password))) {
       return next(createError('Invalid email or password', 401, 'INVALID_CREDENTIALS'));
+    }
+
+    const userRole = user.role || 'farmer';
+    if (!user.role) {
+      user.role = 'farmer';
+    }
+
+    if (expectedRole && ['farmer', 'customer'].includes(expectedRole) && userRole !== expectedRole) {
+      return next(createError(`This account is registered as ${userRole}. Please use the ${userRole} login page.`, 403, 'ROLE_MISMATCH'));
     }
 
     // Check if user is active
@@ -106,6 +121,7 @@ class AuthController {
       user: {
         id: user._id,
         email: user.email,
+        role: userRole,
         profile: user.profile,
         settings: user.settings,
         isVerified: user.isVerified,
@@ -113,6 +129,101 @@ class AuthController {
       },
       ...tokenData
     }, 'Login successful');
+  });
+
+  // Google OAuth (ID token based)
+  static googleAuth = catchAsync(async (req, res, next) => {
+    const { idToken, expectedRole } = req.body;
+
+    if (!idToken) {
+      return next(createError('Google ID token is required', 400, 'GOOGLE_TOKEN_REQUIRED'));
+    }
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return next(createError('Google OAuth is not configured on server', 500, 'GOOGLE_OAUTH_NOT_CONFIGURED'));
+    }
+
+    let payload;
+    try {
+      const ticket = await AuthController.googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      return next(createError('Invalid Google token', 401, 'INVALID_GOOGLE_TOKEN'));
+    }
+
+    const email = String(payload?.email || '').toLowerCase().trim();
+    const name = String(payload?.name || '').trim();
+    const emailVerified = Boolean(payload?.email_verified);
+
+    if (!email || !name) {
+      return next(createError('Google account data is incomplete', 400, 'INVALID_GOOGLE_PROFILE'));
+    }
+
+    if (!emailVerified) {
+      return next(createError('Google email is not verified', 403, 'GOOGLE_EMAIL_NOT_VERIFIED'));
+    }
+
+    let user = await User.findOne({ email });
+    const selectedRole = ['farmer', 'customer'].includes(expectedRole) ? expectedRole : 'farmer';
+
+    if (!user) {
+      const oauthPassword = `oauth_google_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+      user = await User.create({
+        email,
+        role: selectedRole,
+        password: oauthPassword,
+        isVerified: true,
+        profile: {
+          name
+        }
+      });
+    } else {
+      const userRole = user.role || 'farmer';
+      if (expectedRole && ['farmer', 'customer'].includes(expectedRole) && userRole !== expectedRole) {
+        return next(createError(`This account is registered as ${userRole}. Please use the ${userRole} login page.`, 403, 'ROLE_MISMATCH'));
+      }
+
+      if (!user.role) {
+        user.role = 'farmer';
+      }
+      if (!user.profile?.name && name) {
+        user.profile = {
+          ...(user.profile || {}),
+          name
+        };
+      }
+      if (!user.isVerified) {
+        user.isVerified = true;
+      }
+    }
+
+    if (!user.isActive) {
+      return next(createError('Account is deactivated. Please contact support.', 401, 'ACCOUNT_DEACTIVATED'));
+    }
+
+    user.stats.loginCount += 1;
+    await user.save({ validateBeforeSave: false });
+
+    const tokenData = JWTUtils.generateTokenPair({
+      id: user._id,
+      email: user.email
+    });
+
+    sendResponse(res, 200, {
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role || 'farmer',
+        profile: user.profile,
+        settings: user.settings,
+        isVerified: user.isVerified,
+        stats: user.stats
+      },
+      ...tokenData
+    }, 'Google login successful');
   });
 
   // Refresh access token
@@ -154,6 +265,7 @@ class AuthController {
       user: {
         id: userData._id,
         email: userData.email,
+        role: userData.role || 'farmer',
         profile: userData.profile,
         settings: userData.settings,
         isVerified: userData.isVerified,
@@ -185,10 +297,13 @@ class AuthController {
       
       // Handle nested farmDetails object
       if (profile.farmDetails) {
-        updateObj.profile.farmDetails = { 
-          ...user.profile.farmDetails, 
-          ...profile.farmDetails 
-        };
+        const effectiveRole = user.role || 'farmer';
+        if (effectiveRole === 'farmer') {
+          updateObj.profile.farmDetails = {
+            ...user.profile.farmDetails,
+            ...profile.farmDetails
+          };
+        }
       }
     }
     
@@ -219,6 +334,7 @@ class AuthController {
       user: {
         id: updatedUser._id,
         email: updatedUser.email,
+        role: updatedUser.role || 'farmer',
         profile: updatedUser.profile,
         settings: updatedUser.settings,
         isVerified: updatedUser.isVerified

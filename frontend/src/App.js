@@ -7,10 +7,15 @@ import { CircularProgress, Box } from '@mui/material';
 // Import screens
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import RoleSelectionScreen from './screens/RoleSelectionScreen';
 import Dashboard from './screens/Dashboard';
 import WeatherScreen from './screens/WeatherScreen';
 import MarketScreen from './screens/MarketScreen';
 import DiseaseScreen from './screens/DiseaseScreen';
+import CropRecommendationScreen from './screens/CropRecommendationScreen';
+import FertilizerRecommendationScreen from './screens/FertilizerRecommendationScreen';
+import YieldPredictionScreen from './screens/YieldPredictionScreen';
+import MarketplaceScreen from './screens/MarketplaceScreen';
 import ChatScreen from './screens/ChatScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import TestNotifications from './screens/TestNotifications';
@@ -40,6 +45,7 @@ const theme = createTheme({
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState('farmer');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -48,17 +54,24 @@ function App() {
 
   const checkAuthStatus = () => {
     const token = localStorage.getItem('accessToken');
+    const savedRole = localStorage.getItem('userRole') || 'farmer';
     setIsAuthenticated(!!token);
+    setUserRole(savedRole);
     setIsLoading(false);
   };
 
-  const handleLogin = () => {
+  const handleLogin = (user = null) => {
+    const role = user?.role || localStorage.getItem('userRole') || 'farmer';
+    localStorage.setItem('userRole', role);
+    setUserRole(role);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userRole');
+    setUserRole('farmer');
     setIsAuthenticated(false);
   };
 
@@ -84,12 +97,42 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route
+            path="/choose-role"
+            element={
+              isAuthenticated ? (
+                <Navigate to={userRole === 'customer' ? '/marketplace' : '/dashboard'} replace />
+              ) : (
+                <RoleSelectionScreen />
+              )
+            }
+          />
+          <Route
             path="/login"
             element={
               isAuthenticated ? (
                 <Navigate to="/dashboard" replace />
               ) : (
-                <LoginScreen onLogin={handleLogin} />
+                <LoginScreen onLogin={handleLogin} userRole="farmer" />
+              )
+            }
+          />
+          <Route
+            path="/customer-login"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/marketplace" replace />
+              ) : (
+                <LoginScreen onLogin={handleLogin} userRole="customer" />
+              )
+            }
+          />
+          <Route
+            path="/farmer-login"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LoginScreen onLogin={handleLogin} userRole="farmer" />
               )
             }
           />
@@ -99,7 +142,27 @@ function App() {
               isAuthenticated ? (
                 <Navigate to="/dashboard" replace />
               ) : (
-                <RegisterScreen onRegister={handleLogin} />
+                <RegisterScreen onRegister={handleLogin} userRole="farmer" />
+              )
+            }
+          />
+          <Route
+            path="/customer-register"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/marketplace" replace />
+              ) : (
+                <RegisterScreen onRegister={handleLogin} userRole="customer" />
+              )
+            }
+          />
+          <Route
+            path="/farmer-register"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <RegisterScreen onRegister={handleLogin} userRole="farmer" />
               )
             }
           />
@@ -109,7 +172,7 @@ function App() {
               isAuthenticated ? (
                 <Dashboard onLogout={handleLogout} />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -119,7 +182,7 @@ function App() {
               isAuthenticated ? (
                 <WeatherScreen />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -129,7 +192,7 @@ function App() {
               isAuthenticated ? (
                 <MarketScreen />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -139,7 +202,47 @@ function App() {
               isAuthenticated ? (
                 <DiseaseScreen />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
+              )
+            }
+          />
+          <Route
+            path="/crop-recommendation"
+            element={
+              isAuthenticated ? (
+                <CropRecommendationScreen />
+              ) : (
+                <Navigate to="/choose-role" replace />
+              )
+            }
+          />
+          <Route
+            path="/fertilizer-recommendation"
+            element={
+              isAuthenticated ? (
+                <FertilizerRecommendationScreen />
+              ) : (
+                <Navigate to="/choose-role" replace />
+              )
+            }
+          />
+          <Route
+            path="/yield-prediction"
+            element={
+              isAuthenticated ? (
+                <YieldPredictionScreen />
+              ) : (
+                <Navigate to="/choose-role" replace />
+              )
+            }
+          />
+          <Route
+            path="/marketplace"
+            element={
+              isAuthenticated ? (
+                <MarketplaceScreen onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -149,7 +252,7 @@ function App() {
               isAuthenticated ? (
                 <ChatScreen />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -159,7 +262,7 @@ function App() {
               isAuthenticated ? (
                 <ProfileScreen />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
@@ -169,14 +272,14 @@ function App() {
               isAuthenticated ? (
                 <TestNotifications />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/choose-role" replace />
               )
             }
           />
           <Route
             path="/"
             element={
-              <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+              <Navigate to={isAuthenticated ? (userRole === 'customer' ? '/marketplace' : '/dashboard') : '/choose-role'} replace />
             }
           />
         </Routes>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -33,47 +33,32 @@ import {
   TrendingFlat,
   ShowChart,
   Search,
-  Category,
-  CompareArrows,
   NotificationsActive,
   Delete,
   Refresh,
 } from '@mui/icons-material';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
 import api from '../services/api.web';
+import { DEFAULT_PROFILE_STATE, INDIAN_STATES_AND_UTS } from '../constants/locationOptions';
+import { FALLBACK_CATEGORY_MAP, FALLBACK_CATEGORIES } from '../constants/marketOptions';
 
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+const MARKET_META_CACHE = {
+  categories: null,
+  cropsByCategory: {},
+  alerts: null,
+  profileDefaults: null
+};
 
 const MarketScreen = () => {
+  const availableStates = INDIAN_STATES_AND_UTS;
+
   const [activeTab, setActiveTab] = useState(0);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
+  const [selectedState, setSelectedState] = useState(DEFAULT_PROFILE_STATE);
   const [crops, setCrops] = useState([]);
   const [prices, setPrices] = useState([]);
   const [insights, setInsights] = useState(null);
-  const [historical, setHistorical] = useState([]);
   const [comparison, setComparison] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -86,73 +71,152 @@ const MarketScreen = () => {
     condition: 'above'
   });
 
+  const getApiErrorMessage = useCallback((err, fallbackMessage) => {
+    const status = err?.response?.status;
+    if (status === 429) {
+      return 'Too many requests right now. Please wait a few seconds and try again.';
+    }
+    return err?.response?.data?.error?.message || fallbackMessage;
+  }, []);
+
+  const fetchPrices = useCallback(async (commodity, state) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get(`/market/prices?commodity=${encodeURIComponent(commodity)}&state=${encodeURIComponent(state)}&limit=20`);
+      setPrices(response.data.data.prices);
+      setInsights(response.data.data.insights);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to fetch market prices'));
+    } finally {
+      setLoading(false);
+    }
+  }, [getApiErrorMessage]);
+
+  const fetchCategories = useCallback(async () => {
+    if (MARKET_META_CACHE.categories?.length) {
+      setCategories(MARKET_META_CACHE.categories);
+      setSelectedCategory((prev) => prev || MARKET_META_CACHE.categories[0].id);
+      return;
+    }
+
+    try {
+      const response = await api.get('/market/categories');
+      const apiCategories = response.data?.data?.categories || [];
+
+      if (apiCategories.length > 0) {
+        MARKET_META_CACHE.categories = apiCategories;
+        setCategories(apiCategories);
+        setSelectedCategory((prev) => prev || apiCategories[0].id);
+      } else {
+        MARKET_META_CACHE.categories = FALLBACK_CATEGORIES;
+        setCategories(FALLBACK_CATEGORIES);
+        setSelectedCategory((prev) => prev || FALLBACK_CATEGORIES[0].id);
+      }
+    } catch (err) {
+      MARKET_META_CACHE.categories = FALLBACK_CATEGORIES;
+      setCategories(FALLBACK_CATEGORIES);
+      setSelectedCategory((prev) => prev || FALLBACK_CATEGORIES[0].id);
+    }
+  }, []);
+
+  const fetchProfileDefaults = useCallback(async () => {
+    if (MARKET_META_CACHE.profileDefaults) {
+      const { state, primaryCrop } = MARKET_META_CACHE.profileDefaults;
+      setSelectedState(state || DEFAULT_PROFILE_STATE);
+      if (primaryCrop) {
+        setSelectedCrop((prev) => prev || primaryCrop);
+      }
+      return;
+    }
+
+    try {
+      const response = await api.get('/auth/profile');
+      const user = response.data?.data?.user;
+      const state = user?.profile?.location?.state || DEFAULT_PROFILE_STATE;
+      const primaryCrop = user?.profile?.farmDetails?.cropsGrown?.[0] || null;
+
+      MARKET_META_CACHE.profileDefaults = { state, primaryCrop };
+      setSelectedState(state);
+      if (primaryCrop) {
+        setSelectedCrop((prev) => prev || primaryCrop);
+      }
+    } catch (err) {
+      MARKET_META_CACHE.profileDefaults = { state: DEFAULT_PROFILE_STATE, primaryCrop: null };
+      setSelectedState(DEFAULT_PROFILE_STATE);
+    }
+  }, []);
+
+  const fetchCropsByCategory = useCallback(async (category) => {
+    const cachedCrops = MARKET_META_CACHE.cropsByCategory[category];
+    if (cachedCrops?.length) {
+      setCrops(cachedCrops);
+      setSelectedCrop((prev) => (!prev || !cachedCrops.includes(prev) ? cachedCrops[0] : prev));
+      return;
+    }
+
+    try {
+      const response = await api.get(`/market/categories/${category}`);
+      const apiCrops = response.data?.data?.crops || [];
+
+      if (apiCrops.length > 0) {
+        MARKET_META_CACHE.cropsByCategory[category] = apiCrops;
+        setCrops(apiCrops);
+        setSelectedCrop((prev) => (!prev || !apiCrops.includes(prev) ? apiCrops[0] : prev));
+      } else {
+        const fallbackCrops = FALLBACK_CATEGORY_MAP[category] || [];
+        MARKET_META_CACHE.cropsByCategory[category] = fallbackCrops;
+        setCrops(fallbackCrops);
+        if (fallbackCrops.length > 0) {
+          setSelectedCrop((prev) => (!prev || !fallbackCrops.includes(prev) ? fallbackCrops[0] : prev));
+        }
+      }
+    } catch (err) {
+      const fallbackCrops = FALLBACK_CATEGORY_MAP[category] || [];
+      MARKET_META_CACHE.cropsByCategory[category] = fallbackCrops;
+      setCrops(fallbackCrops);
+      if (fallbackCrops.length > 0) {
+        setSelectedCrop((prev) => (!prev || !fallbackCrops.includes(prev) ? fallbackCrops[0] : prev));
+      }
+    }
+  }, []);
+
   // Fetch categories on mount
+  const fetchAlerts = useCallback(async (force = false) => {
+    if (!force && Array.isArray(MARKET_META_CACHE.alerts)) {
+      setAlerts(MARKET_META_CACHE.alerts);
+      return;
+    }
+
+    try {
+      const response = await api.get('/market/alerts');
+      const apiAlerts = response.data?.data?.alerts || [];
+      MARKET_META_CACHE.alerts = apiAlerts;
+      setAlerts(apiAlerts);
+    } catch (err) {
+      console.error('Failed to fetch alerts:', err);
+    }
+  }, []);
+
   useEffect(() => {
+    fetchProfileDefaults();
     fetchCategories();
     fetchAlerts();
-  }, []);
+  }, [fetchProfileDefaults, fetchCategories, fetchAlerts]);
 
   // Fetch crops when category changes
   useEffect(() => {
     if (selectedCategory) {
       fetchCropsByCategory(selectedCategory);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, fetchCropsByCategory]);
 
-  // Fetch prices when crop changes
+  // Fetch current prices when crop/state changes.
   useEffect(() => {
     if (selectedCrop) {
-      fetchPrices(selectedCrop);
-      fetchHistorical(selectedCrop);
+      fetchPrices(selectedCrop, selectedState);
     }
-  }, [selectedCrop]);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await api.get('/market/categories');
-      setCategories(response.data.data.categories);
-      if (response.data.data.categories.length > 0) {
-        setSelectedCategory(response.data.data.categories[0].id);
-      }
-    } catch (err) {
-      setError('Failed to load categories');
-    }
-  };
-
-  const fetchCropsByCategory = async (category) => {
-    try {
-      const response = await api.get(`/market/categories/${category}`);
-      setCrops(response.data.data.crops);
-      if (response.data.data.crops.length > 0) {
-        setSelectedCrop(response.data.data.crops[0]);
-      }
-    } catch (err) {
-      setError('Failed to load crops');
-    }
-  };
-
-  const fetchPrices = async (commodity) => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await api.get(`/market/prices?commodity=${encodeURIComponent(commodity)}&limit=20`);
-      setPrices(response.data.data.prices);
-      setInsights(response.data.data.insights);
-    } catch (err) {
-      setError('Failed to fetch market prices');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchHistorical = async (commodity, days = 30) => {
-    try {
-      const response = await api.get(`/market/historical?commodity=${encodeURIComponent(commodity)}&days=${days}`);
-      setHistorical(response.data.data.historical);
-    } catch (err) {
-      console.error('Failed to fetch historical data:', err);
-    }
-  };
+  }, [selectedCrop, selectedState, fetchPrices]);
 
   const fetchComparison = async (commodity) => {
     setLoading(true);
@@ -166,21 +230,12 @@ const MarketScreen = () => {
     }
   };
 
-  const fetchAlerts = async () => {
-    try {
-      const response = await api.get('/market/alerts');
-      setAlerts(response.data.data.alerts);
-    } catch (err) {
-      console.error('Failed to fetch alerts:', err);
-    }
-  };
-
   const createAlert = async () => {
     try {
       await api.post('/market/alerts', newAlert);
       setAlertDialogOpen(false);
       setNewAlert({ commodity: '', targetPrice: '', condition: 'above' });
-      fetchAlerts();
+      fetchAlerts(true);
     } catch (err) {
       setError('Failed to create alert');
     }
@@ -189,7 +244,7 @@ const MarketScreen = () => {
   const deleteAlert = async (alertId) => {
     try {
       await api.delete(`/market/alerts/${alertId}`);
-      fetchAlerts();
+      fetchAlerts(true);
     } catch (err) {
       setError('Failed to delete alert');
     }
@@ -197,32 +252,16 @@ const MarketScreen = () => {
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      fetchPrices(searchQuery);
-      fetchHistorical(searchQuery);
+      fetchPrices(searchQuery, selectedState);
     }
   };
 
   const handleRefresh = () => {
     if (selectedCrop) {
-      fetchPrices(selectedCrop);
-      fetchHistorical(selectedCrop);
+      fetchPrices(selectedCrop, selectedState);
     }
   };
 
-  // Chart configuration
-  const chartData = {
-    labels: historical.map(h => h.date),
-    datasets: [
-      {
-        label: `${selectedCrop} Price Trend`,
-        data: historical.map(h => h.price),
-        borderColor: '#4CAF50',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-        fill: true,
-        tension: 0.4,
-      },
-    ],
-  };
 
   const chartOptions = {
     responsive: true,
@@ -232,7 +271,7 @@ const MarketScreen = () => {
       },
       title: {
         display: true,
-        text: '30-Day Price Trend',
+        text: 'Price Trend',
       },
     },
     scales: {
@@ -283,7 +322,7 @@ const MarketScreen = () => {
       {/* Category and Crop Selection */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <FormControl fullWidth>
               <InputLabel>Category</InputLabel>
               <Select
@@ -299,7 +338,7 @@ const MarketScreen = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <FormControl fullWidth>
               <InputLabel>Crop</InputLabel>
               <Select
@@ -315,7 +354,23 @@ const MarketScreen = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>State</InputLabel>
+              <Select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                label="State"
+              >
+                {availableStates.map((state) => (
+                  <MenuItem key={state} value={state}>
+                    {state}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={3}>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField
                 fullWidth
@@ -338,7 +393,6 @@ const MarketScreen = () => {
       {/* Tabs */}
       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
         <Tab label="Current Prices" />
-        <Tab label="Price Trends" />
         <Tab label="Comparison" />
         <Tab label="Price Alerts" />
       </Tabs>
@@ -417,15 +471,8 @@ const MarketScreen = () => {
         </>
       )}
 
-      {/* Tab 1: Price Trends */}
-      {activeTab === 1 && !loading && historical.length > 0 && (
-        <Paper sx={{ p: 3 }}>
-          <Line data={chartData} options={chartOptions} />
-        </Paper>
-      )}
-
-      {/* Tab 2: Comparison */}
-      {activeTab === 2 && (
+      {/* Tab 1: Comparison */}
+      {activeTab === 1 && (
         <Box>
           <Button
             variant="contained"
@@ -462,8 +509,8 @@ const MarketScreen = () => {
         </Box>
       )}
 
-      {/* Tab 3: Price Alerts */}
-      {activeTab === 3 && (
+      {/* Tab 2: Price Alerts */}
+      {activeTab === 2 && (
         <Box>
           <Button
             variant="contained"

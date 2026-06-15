@@ -86,7 +86,7 @@ class MarketController {
    * Get historical price trends
    */
   static getHistoricalPrices = catchAsync(async (req, res, next) => {
-    const { commodity, days } = req.query;
+    const { commodity, days, market, state } = req.query;
 
     if (!commodity) {
       return next(createError('Commodity name is required', 400, 'COMMODITY_REQUIRED'));
@@ -97,16 +97,18 @@ class MarketController {
       return next(createError('Maximum 365 days of historical data allowed', 400, 'INVALID_DAYS'));
     }
 
-    const historical = await marketService.getHistoricalPrices(commodity, daysCount);
+    const historical = await marketService.getHistoricalPrices(commodity, daysCount, market || null, state || null);
 
     // Calculate statistics
     const prices = historical.map(h => h.price);
-    const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const maxPrice = Math.max(...prices);
-    const minPrice = Math.min(...prices);
+    const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
 
     sendResponse(res, 200, {
       commodity,
+      market: market || null,
+      state: state || null,
       historical,
       statistics: {
         avgPrice: avgPrice.toFixed(2),

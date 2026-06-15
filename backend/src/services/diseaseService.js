@@ -40,21 +40,40 @@ class DiseaseService {
         // Extract confidence percentage
         const confidenceStr = response.data.confidence.replace('%', '');
         const confidence = parseFloat(confidenceStr);
+        const isTrained = response.data.model_trained || false;
+        const modelAccuracy = response.data.model_accuracy || 0;
         
-        // Log AI model's prediction (untrained model)
-        console.log(`⚠️  AI Model Result: ${response.data.disease} (${confidence}% confidence)`);
-        console.log(`⚠️  Model Status: Using ImageNet weights only - not trained on PlantVillage yet`);
-        console.log(`📊 Training Required: Need to train on Kaggle PlantVillage dataset (8-12 hrs GPU)`);
+        // Log AI model's prediction
+        console.log(`🔬 AI Model Result: ${response.data.disease} (${confidence}% confidence)`);
         
-        // Fall back to Plant.id API for accurate results
-        console.log(`📡 Falling back to Plant.id API for accurate disease detection...`);
-        if (this.apiKey && this.apiKey !== 'YOUR_API_KEY') {
-          return this.analyzeDiseaseWithPlantId(imagePath, imageBase64);
+        if (isTrained) {
+          console.log(`✅ Using TRAINED model (${modelAccuracy.toFixed(2)}% validation accuracy)`);
+          
+          // If trained model has good confidence, use it directly
+          if (confidence >= 60) {
+            console.log(`✅ High confidence - using AI model prediction`);
+            return this.formatAIAnalysisResult(response.data);
+          } else {
+            // Low confidence - fallback to Plant.id if available
+            console.log(`⚠️  Low confidence (${confidence}%) - falling back to Plant.id API`);
+            if (this.apiKey && this.apiKey !== 'YOUR_API_KEY') {
+              return this.analyzeDiseaseWithPlantId(imagePath, imageBase64);
+            }
+            return this.formatAIAnalysisResult(response.data);
+          }
+        } else {
+          // Model not trained - prefer Plant.id
+          console.log(`⚠️  Model Status: Using ImageNet weights only - not trained on PlantVillage yet`);
+          console.log(`📊 Training Required: Train on Kaggle PlantVillage dataset`);
+          console.log(`📡 Falling back to Plant.id API for accurate disease detection...`);
+          
+          if (this.apiKey && this.apiKey !== 'YOUR_API_KEY') {
+            return this.analyzeDiseaseWithPlantId(imagePath, imageBase64);
+          }
+          
+          console.log(`⚠️  No Plant.id API key - returning untrained model prediction`);
+          return this.formatAIAnalysisResult(response.data);
         }
-        
-        // No API key - return AI result with warning
-        console.log(`⚠️  No Plant.id API key - returning untrained model prediction`);
-        return this.formatAIAnalysisResult(response.data);
       } else {
         throw new Error(response.data.error || 'AI detection failed');
       }

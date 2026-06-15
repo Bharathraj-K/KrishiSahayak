@@ -21,7 +21,12 @@ const registerValidation = [
   body('phone')
     .optional()
     .isMobilePhone('en-IN')
-    .withMessage('Please provide a valid Indian phone number')
+    .withMessage('Please provide a valid Indian phone number'),
+
+  body('role')
+    .optional()
+    .isIn(['farmer', 'customer'])
+    .withMessage('Role must be farmer or customer')
 ];
 
 // Validation rules for user login
@@ -34,6 +39,12 @@ const loginValidation = [
   body('password')
     .notEmpty()
     .withMessage('Password is required')
+    ,
+
+  body('expectedRole')
+    .optional()
+    .isIn(['farmer', 'customer'])
+    .withMessage('expectedRole must be farmer or customer')
 ];
 
 // Validation rules for password change

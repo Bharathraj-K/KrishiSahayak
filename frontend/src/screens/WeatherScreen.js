@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Box,
@@ -28,42 +28,19 @@ import {
 } from '@mui/icons-material';
 import api from '../services/api.web';
 
+const DEFAULT_WEATHER_CITY = 'Noida';
+
 const WeatherScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState(DEFAULT_WEATHER_CITY);
   const [currentWeather, setCurrentWeather] = useState(null);
   const [forecast, setForecast] = useState(null);
 
-  useEffect(() => {
-    // Try to get weather for user's location on mount
-    getUserLocationWeather();
-  }, []);
+  const searchWeather = useCallback(async (targetCityInput) => {
+    const targetCity = String(targetCityInput || '').trim();
 
-  const getUserLocationWeather = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const response = await api.get('/weather/my-location');
-      
-      if (response.data.success) {
-        setCurrentWeather(response.data.data);
-        // Also fetch forecast
-        if (response.data.data.location) {
-          await getForecast(response.data.data.location.name);
-        }
-      }
-    } catch (error) {
-      // Silently fail - user can manually search
-      console.log('No location in profile');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const searchWeather = async () => {
-    if (!city.trim()) {
+    if (!targetCity) {
       setError('Please enter a city name');
       return;
     }
@@ -73,12 +50,13 @@ const WeatherScreen = () => {
       setError('');
 
       const [weatherResponse, forecastResponse] = await Promise.all([
-        api.get(`/weather/current?city=${encodeURIComponent(city)}`),
-        api.get(`/weather/forecast?city=${encodeURIComponent(city)}`)
+        api.get(`/weather/current?city=${encodeURIComponent(targetCity)}`),
+        api.get(`/weather/forecast?city=${encodeURIComponent(targetCity)}`)
       ]);
 
       if (weatherResponse.data.success) {
         setCurrentWeather(weatherResponse.data.data);
+        setCity(targetCity);
       }
 
       if (forecastResponse.data.success) {
@@ -89,18 +67,11 @@ const WeatherScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getForecast = async (cityName) => {
-    try {
-      const response = await api.get(`/weather/forecast?city=${encodeURIComponent(cityName)}`);
-      if (response.data.success) {
-        setForecast(response.data.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch forecast');
-    }
-  };
+  useEffect(() => {
+    searchWeather(DEFAULT_WEATHER_CITY);
+  }, [searchWeather]);
 
   const getWeatherIcon = (condition) => {
     const icons = {
@@ -129,6 +100,9 @@ const WeatherScreen = () => {
       <Typography variant="body2" color="text.secondary" gutterBottom>
         Get accurate weather forecasts and farming advice
       </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Default city: {DEFAULT_WEATHER_CITY}
+      </Typography>
 
       {/* Search Box */}
       <Paper sx={{ p: 2, mt: 3 }}>
@@ -138,14 +112,14 @@ const WeatherScreen = () => {
             placeholder="Enter city name (e.g., Mumbai, Delhi)"
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && searchWeather()}
+            onKeyPress={(e) => e.key === 'Enter' && searchWeather(city)}
             InputProps={{
               startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />
             }}
           />
           <Button
             variant="contained"
-            onClick={searchWeather}
+            onClick={() => searchWeather(city)}
             disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : <Search />}
             sx={{ minWidth: 120 }}

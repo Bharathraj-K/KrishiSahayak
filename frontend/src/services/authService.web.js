@@ -1,5 +1,14 @@
 import apiClient, { tokenService } from './api.web';
 
+const extractErrorMessage = (error, fallback) => {
+  return (
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+  );
+};
+
 const AuthService = {
   // Register new user
   async register(userData) {
@@ -27,7 +36,7 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Registration failed',
+        message: extractErrorMessage(error, 'Registration failed'),
       };
     }
   },
@@ -58,7 +67,33 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Login failed',
+        message: extractErrorMessage(error, 'Login failed'),
+      };
+    }
+  },
+
+  // Google OAuth login/register
+  async googleAuth(payload) {
+    try {
+      const response = await apiClient.post('/auth/google', payload);
+      const { data } = response.data;
+      if (data.accessToken && data.refreshToken) {
+        tokenService.saveTokens(data.accessToken, data.refreshToken);
+      }
+
+      return {
+        success: true,
+        user: data.user,
+        tokens: {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: extractErrorMessage(error, 'Google login failed')
       };
     }
   },
@@ -74,7 +109,7 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to fetch profile',
+        message: extractErrorMessage(error, 'Failed to fetch profile'),
       };
     }
   },
@@ -90,7 +125,7 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to update profile',
+        message: extractErrorMessage(error, 'Failed to update profile'),
       };
     }
   },
@@ -106,7 +141,7 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to change password',
+        message: extractErrorMessage(error, 'Failed to change password'),
       };
     }
   },
@@ -123,7 +158,7 @@ const AuthService = {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to delete account',
+        message: extractErrorMessage(error, 'Failed to delete account'),
       };
     }
   },

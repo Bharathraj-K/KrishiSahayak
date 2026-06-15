@@ -1,3 +1,7 @@
+const dns = require('node:dns');
+dns.setServers(['1.1.1.1', '8.8.8.8']); // Use Cloudflare and Google DNS
+
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -16,6 +20,11 @@ const marketRoutes = require('./src/routes/market');
 const diseaseRoutes = require('./src/routes/disease');
 const chatRoutes = require('./src/routes/chat');
 const notificationRoutes = require('./src/routes/notifications');
+const cropRecommendationRoutes = require('./src/routes/cropRecommendation');
+const dashboardRoutes = require('./src/routes/dashboard');
+const fertilizerRoutes = require('./ml/fertilizer_recommendation/routes/fertilizer');
+const yieldRoutes = require('./src/routes/yield');
+const marketplaceRoutes = require('./src/routes/marketplace');
 
 // Initialize express app
 const app = express();
@@ -39,14 +48,21 @@ app.use(cors({
 }));
 
 // Rate limiting
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const devMaxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_DEV) || 5000;
+const prodMaxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100;
+
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  // Keep strong limits in production but avoid blocking normal local development flows.
+  max: isDevelopment ? devMaxRequests : prodMaxRequests,
   message: {
     success: false,
     error: {
       code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests from this IP, please try again later.'
+      message: isDevelopment
+        ? 'Rate limit reached in development. Increase RATE_LIMIT_MAX_REQUESTS_DEV if needed.'
+        : 'Too many requests from this IP, please try again later.'
     }
   },
   standardHeaders: true,
@@ -87,6 +103,11 @@ app.use('/api/market', marketRoutes);
 app.use('/api/disease', diseaseRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/crop-recommendation', cropRecommendationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/fertilizer', fertilizerRoutes);
+app.use('/api/yield', yieldRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // Handle undefined routes
 app.use(notFound);

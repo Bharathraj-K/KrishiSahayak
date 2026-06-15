@@ -31,6 +31,7 @@ import {
   Notifications,
 } from '@mui/icons-material';
 import api from '../services/api.web';
+import { DEFAULT_PROFILE_STATE, INDIAN_STATES_AND_UTS } from '../constants/locationOptions';
 
 const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
@@ -71,7 +72,8 @@ const ProfileScreen = () => {
   const [userInfo, setUserInfo] = useState({
     email: '',
     memberSince: '',
-    isVerified: false
+    isVerified: false,
+    role: 'farmer'
   });
 
   const [newCrop, setNewCrop] = useState('');
@@ -89,11 +91,11 @@ const ProfileScreen = () => {
       setProfile({
         name: userData.profile.name || '',
         phone: userData.profile.phone || '',
-        location: userData.profile.location || {
-          address: '',
-          city: '',
-          state: '',
-          pincode: ''
+        location: {
+          address: userData.profile.location?.address || '',
+          city: userData.profile.location?.city || '',
+          state: userData.profile.location?.state || DEFAULT_PROFILE_STATE,
+          pincode: userData.profile.location?.pincode || ''
         },
         farmDetails: userData.profile.farmDetails || {
           farmSize: 'Small (< 2 acres)',
@@ -118,7 +120,8 @@ const ProfileScreen = () => {
       setUserInfo({
         email: userData.email,
         memberSince: new Date(userData.memberSince).toLocaleDateString(),
-        isVerified: userData.isVerified
+        isVerified: userData.isVerified,
+        role: userData.role || 'farmer'
       });
 
       setError('');
@@ -135,8 +138,20 @@ const ProfileScreen = () => {
       setSaving(true);
       setError('');
       
+      const normalizedProfile = {
+        ...profile,
+        location: {
+          ...profile.location,
+          state: profile.location.state || DEFAULT_PROFILE_STATE
+        }
+      };
+
+      if ((userInfo.role || 'farmer') !== 'farmer') {
+        delete normalizedProfile.farmDetails;
+      }
+
       await api.put('/auth/profile', {
-        profile,
+        profile: normalizedProfile,
         settings
       });
 
@@ -305,16 +320,23 @@ const ProfileScreen = () => {
             />
           </Grid>
           <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              label="State"
-              value={profile.location.state}
-              onChange={(e) => setProfile({
-                ...profile,
-                location: { ...profile.location, state: e.target.value }
-              })}
-              disabled={!editing}
-            />
+            <FormControl fullWidth disabled={!editing}>
+              <InputLabel>State</InputLabel>
+              <Select
+                value={profile.location.state || DEFAULT_PROFILE_STATE}
+                label="State"
+                onChange={(e) => setProfile({
+                  ...profile,
+                  location: { ...profile.location, state: e.target.value }
+                })}
+              >
+                {INDIAN_STATES_AND_UTS.map((state) => (
+                  <MenuItem key={state} value={state}>
+                    {state}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
           <Grid item xs={12} sm={4}>
             <TextField
@@ -331,117 +353,118 @@ const ProfileScreen = () => {
         </Grid>
       </Paper>
 
-      {/* Farm Details */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          <Agriculture sx={{ verticalAlign: 'middle', mr: 1 }} />
-          Farm Details
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth disabled={!editing}>
-              <InputLabel>Farm Size</InputLabel>
-              <Select
-                value={profile.farmDetails.farmSize}
-                label="Farm Size"
-                onChange={(e) => setProfile({
-                  ...profile,
-                  farmDetails: { ...profile.farmDetails, farmSize: e.target.value }
-                })}
-              >
-                <MenuItem value="Small (< 2 acres)">Small (&lt; 2 acres)</MenuItem>
-                <MenuItem value="Medium (2-10 acres)">Medium (2-10 acres)</MenuItem>
-                <MenuItem value="Large (> 10 acres)">Large (&gt; 10 acres)</MenuItem>
-                <MenuItem value="Commercial">Commercial</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth disabled={!editing}>
-              <InputLabel>Farm Type</InputLabel>
-              <Select
-                value={profile.farmDetails.farmType}
-                label="Farm Type"
-                onChange={(e) => setProfile({
-                  ...profile,
-                  farmDetails: { ...profile.farmDetails, farmType: e.target.value }
-                })}
-              >
-                <MenuItem value="Organic">Organic</MenuItem>
-                <MenuItem value="Conventional">Conventional</MenuItem>
-                <MenuItem value="Mixed">Mixed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth disabled={!editing}>
-              <InputLabel>Soil Type</InputLabel>
-              <Select
-                value={profile.farmDetails.soilType}
-                label="Soil Type"
-                onChange={(e) => setProfile({
-                  ...profile,
-                  farmDetails: { ...profile.farmDetails, soilType: e.target.value }
-                })}
-              >
-                <MenuItem value="">Select Soil Type</MenuItem>
-                <MenuItem value="Clay">Clay</MenuItem>
-                <MenuItem value="Sandy">Sandy</MenuItem>
-                <MenuItem value="Loamy">Loamy</MenuItem>
-                <MenuItem value="Silt">Silt</MenuItem>
-                <MenuItem value="Chalky">Chalky</MenuItem>
-                <MenuItem value="Peaty">Peaty</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth disabled={!editing}>
-              <InputLabel>Irrigation Type</InputLabel>
-              <Select
-                value={profile.farmDetails.irrigationType}
-                label="Irrigation Type"
-                onChange={(e) => setProfile({
-                  ...profile,
-                  farmDetails: { ...profile.farmDetails, irrigationType: e.target.value }
-                })}
-              >
-                <MenuItem value="">Select Irrigation</MenuItem>
-                <MenuItem value="Rain-fed">Rain-fed</MenuItem>
-                <MenuItem value="Drip">Drip</MenuItem>
-                <MenuItem value="Sprinkler">Sprinkler</MenuItem>
-                <MenuItem value="Flood">Flood</MenuItem>
-                <MenuItem value="Mixed">Mixed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12}>
-            <Typography variant="body2" gutterBottom>Crops Grown</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-              {profile.farmDetails.cropsGrown.map((crop, idx) => (
-                <Chip
-                  key={idx}
-                  label={crop}
-                  onDelete={editing ? () => handleRemoveCrop(crop) : undefined}
-                  color="primary"
-                  variant="outlined"
-                />
-              ))}
-            </Box>
-            {editing && (
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  size="small"
-                  placeholder="Add crop"
-                  value={newCrop}
-                  onChange={(e) => setNewCrop(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddCrop()}
-                />
-                <Button variant="outlined" onClick={handleAddCrop}>Add</Button>
+      {(userInfo.role || 'farmer') === 'farmer' && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            <Agriculture sx={{ verticalAlign: 'middle', mr: 1 }} />
+            Farm Details
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!editing}>
+                <InputLabel>Farm Size</InputLabel>
+                <Select
+                  value={profile.farmDetails.farmSize}
+                  label="Farm Size"
+                  onChange={(e) => setProfile({
+                    ...profile,
+                    farmDetails: { ...profile.farmDetails, farmSize: e.target.value }
+                  })}
+                >
+                  <MenuItem value="Small (< 2 acres)">Small (&lt; 2 acres)</MenuItem>
+                  <MenuItem value="Medium (2-10 acres)">Medium (2-10 acres)</MenuItem>
+                  <MenuItem value="Large (> 10 acres)">Large (&gt; 10 acres)</MenuItem>
+                  <MenuItem value="Commercial">Commercial</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!editing}>
+                <InputLabel>Farm Type</InputLabel>
+                <Select
+                  value={profile.farmDetails.farmType}
+                  label="Farm Type"
+                  onChange={(e) => setProfile({
+                    ...profile,
+                    farmDetails: { ...profile.farmDetails, farmType: e.target.value }
+                  })}
+                >
+                  <MenuItem value="Organic">Organic</MenuItem>
+                  <MenuItem value="Conventional">Conventional</MenuItem>
+                  <MenuItem value="Mixed">Mixed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!editing}>
+                <InputLabel>Soil Type</InputLabel>
+                <Select
+                  value={profile.farmDetails.soilType}
+                  label="Soil Type"
+                  onChange={(e) => setProfile({
+                    ...profile,
+                    farmDetails: { ...profile.farmDetails, soilType: e.target.value }
+                  })}
+                >
+                  <MenuItem value="">Select Soil Type</MenuItem>
+                  <MenuItem value="Clay">Clay</MenuItem>
+                  <MenuItem value="Sandy">Sandy</MenuItem>
+                  <MenuItem value="Loamy">Loamy</MenuItem>
+                  <MenuItem value="Silt">Silt</MenuItem>
+                  <MenuItem value="Chalky">Chalky</MenuItem>
+                  <MenuItem value="Peaty">Peaty</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!editing}>
+                <InputLabel>Irrigation Type</InputLabel>
+                <Select
+                  value={profile.farmDetails.irrigationType}
+                  label="Irrigation Type"
+                  onChange={(e) => setProfile({
+                    ...profile,
+                    farmDetails: { ...profile.farmDetails, irrigationType: e.target.value }
+                  })}
+                >
+                  <MenuItem value="">Select Irrigation</MenuItem>
+                  <MenuItem value="Rain-fed">Rain-fed</MenuItem>
+                  <MenuItem value="Drip">Drip</MenuItem>
+                  <MenuItem value="Sprinkler">Sprinkler</MenuItem>
+                  <MenuItem value="Flood">Flood</MenuItem>
+                  <MenuItem value="Mixed">Mixed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="body2" gutterBottom>Crops Grown</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                {profile.farmDetails.cropsGrown.map((crop, idx) => (
+                  <Chip
+                    key={idx}
+                    label={crop}
+                    onDelete={editing ? () => handleRemoveCrop(crop) : undefined}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
               </Box>
-            )}
+              {editing && (
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    size="small"
+                    placeholder="Add crop"
+                    value={newCrop}
+                    onChange={(e) => setNewCrop(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCrop()}
+                  />
+                  <Button variant="outlined" onClick={handleAddCrop}>Add</Button>
+                </Box>
+              )}
+            </Grid>
           </Grid>
-        </Grid>
-      </Paper>
+        </Paper>
+      )}
 
       {/* Notification Settings */}
       <Paper sx={{ p: 3 }}>

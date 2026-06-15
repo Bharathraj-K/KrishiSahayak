@@ -22,10 +22,12 @@ import {
   Person,
 } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import AuthService from '../services/authService.web';
 
-const RegisterScreen = ({ onRegister }) => {
+const RegisterScreen = ({ onRegister, userRole = 'farmer' }) => {
   const navigate = useNavigate();
+  const isCustomer = userRole === 'customer';
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -36,6 +38,7 @@ const RegisterScreen = ({ onRegister }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
   const handleChange = (e) => {
     setFormData({
@@ -99,11 +102,15 @@ const RegisterScreen = ({ onRegister }) => {
         name: formData.name.trim(),
         email: formData.email.toLowerCase().trim(),
         password: formData.password,
+        role: userRole
       });
 
       if (result.success) {
-        onRegister();
-        navigate('/dashboard');
+        onRegister({
+          ...(result.user || {}),
+          role: userRole
+        });
+        navigate(isCustomer ? '/marketplace' : '/dashboard');
       } else {
         setError(result.message || 'Registration failed. Please try again.');
       }
@@ -112,6 +119,41 @@ const RegisterScreen = ({ onRegister }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const idToken = credentialResponse?.credential;
+    if (!idToken) {
+      setError('Google signup failed. Missing credential token.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError('');
+      const result = await AuthService.googleAuth({
+        idToken,
+        expectedRole: userRole
+      });
+
+      if (result.success) {
+        onRegister({
+          ...(result.user || {}),
+          role: result.user?.role || userRole
+        });
+        navigate(isCustomer ? '/marketplace' : '/dashboard');
+      } else {
+        setError(result.message || 'Google signup failed');
+      }
+    } catch (err) {
+      setError('Google signup failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google sign-in was unsuccessful. Please try again.');
   };
 
   return (
@@ -144,10 +186,10 @@ const RegisterScreen = ({ onRegister }) => {
             }}
           />
           <Typography component="h1" variant="h4" gutterBottom color="primary.main">
-            Join KrishiSahayak
+            {isCustomer ? 'Join as Customer' : 'Join as Farmer'}
           </Typography>
           <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-            Create your farmer account
+            {isCustomer ? 'Create your customer account' : 'Create your farmer account'}
           </Typography>
 
           <Box sx={{ width: '100%', marginTop: 2 }}>
@@ -286,16 +328,33 @@ const RegisterScreen = ({ onRegister }) => {
                 {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Register'}
               </Button>
 
+              {googleClientId && (
+                <Box sx={{ mt: 1, mb: 2, display: 'flex', justifyContent: 'center' }}>
+                  <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+                </Box>
+              )}
+
               <Box sx={{ textAlign: 'center', mt: 1 }}>
                 <Typography variant="body2" color="text.secondary">
                   Already have an account?{' '}
                   <MuiLink
                     component={Link}
-                    to="/login"
+                    to={isCustomer ? '/customer-login' : '/farmer-login'}
                     underline="hover"
                     color="primary"
                   >
                     Login Here
+                  </MuiLink>
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  {isCustomer ? 'Want farmer account?' : 'Want customer account?'}{' '}
+                  <MuiLink
+                    component={Link}
+                    to={isCustomer ? '/farmer-register' : '/customer-register'}
+                    underline="hover"
+                    color="primary"
+                  >
+                    {isCustomer ? 'Farmer Register' : 'Customer Register'}
                   </MuiLink>
                 </Typography>
               </Box>

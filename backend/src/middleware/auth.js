@@ -85,7 +85,7 @@ const optionalAuth = async (req, res, next) => {
 // Restrict to specific roles
 const restrictTo = (...roles) => {
   return (req, res, next) => {
-    const userRole = req.user?.role || 'user';
+    const userRole = req.user?.role || 'farmer';
     
     if (!roles.includes(userRole)) {
       return next(createError('Access denied. Insufficient permissions.', 403, 'INSUFFICIENT_PERMISSIONS'));
